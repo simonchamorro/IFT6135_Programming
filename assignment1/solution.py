@@ -74,8 +74,10 @@ class BassetDataset(Dataset):
         # Sequence & Target
         output = {'sequence': None, 'target': None}
 
-        # WRITE CODE HERE
-        breakpoint()
+        # Get items
+        seq = np.swapaxes(self.inputs[idx], 0, 1).astype(np.float32)
+        output['sequence'] = np.swapaxes(seq, 1, 2)
+        output['target'] = self.outputs[idx]
 
         return output
 
@@ -112,10 +114,9 @@ class Basset(nn.Module):
         self.dropout = nn.Dropout(0.3)
         self.num_cell_types = 164
 
-        # TODO dimensions
-        # self.conv1 = nn.Conv2d(1, 300, (19, ?), stride=(1, 1), padding=(9, 0))
-        # self.conv2 = nn.Conv2d(300, 200, (11, 1), stride=(1, 1), padding=(?, 0))
-        # self.conv3 = nn.Conv2d(200, 200, (7, 1), stride=(1, 1), padding=(4, 0))
+        self.conv1 = nn.Conv2d(1, 300, (19, 4), stride=(1, 1), padding=(9, 0))
+        self.conv2 = nn.Conv2d(300, 200, (11, 1), stride=(1, 1), padding=(6, 0))
+        self.conv3 = nn.Conv2d(200, 200, (7, 1), stride=(1, 1), padding=(4, 0))
 
         self.bn1 = nn.BatchNorm2d(300)
         self.bn2 = nn.BatchNorm2d(200)
@@ -134,7 +135,6 @@ class Basset(nn.Module):
         self.fc3 = nn.Linear(1000, self.num_cell_types)
 
     def forward(self, x):
-
         x = self.conv1(x)
         x = self.bn1(x)
         x = F.relu(x)
@@ -306,8 +306,21 @@ def compute_auc_untrained_model(model, dataloader, device):
     """
     output = {'auc': 0.}
 
-    # WRITE CODE HERE
-    breakpoint()
+    # Iterate through data and predict classes
+    num_batches = 0
+    y_pred = []
+    y_true = []
+    for data in dataloader:
+        pred = model(data['sequence'].to(device))
+        pred = F.sigmoid()
+
+        # TODO Save preds and targets
+        
+        num_batches += 1
+        if num_batches >= 100:
+            break
+
+        breakpoint()
 
     return output
 

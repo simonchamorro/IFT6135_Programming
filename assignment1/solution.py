@@ -75,18 +75,19 @@ class BassetDataset(Dataset):
         output = {'sequence': None, 'target': None}
 
         # WRITE CODE HERE
+        breakpoint()
 
         return output
 
     def __len__(self):
-        # WRITE CODE HERE
-        return 0
+        return self.outputs.shape[0]
 
     def get_seq_len(self):
         """
         Answer to Q1 part 2
         """
         # WRITE CODE HERE
+        breakpoint()
         return 0
 
     def is_equivalent(self):
@@ -94,6 +95,7 @@ class BassetDataset(Dataset):
         Answer to Q1 part 3
         """
         # WRITE CODE HERE
+        breakpoint()
         return 0
 
 
@@ -107,32 +109,58 @@ class Basset(nn.Module):
     def __init__(self):
         super(Basset, self).__init__()
 
-        self.dropout = ?
+        self.dropout = nn.Dropout(0.3)
         self.num_cell_types = 164
 
-        self.conv1 = nn.Conv2d(1, 300, (19, ?), stride=(1, 1), padding=(9, 0))
-        self.conv2 = nn.Conv2d(300, ?, (?, 1), stride=(1, 1), padding=(?, 0))
-        self.conv3 = nn.Conv2d(?, 200, (?, 1), stride=(1, 1), padding=(4, 0))
+        # TODO dimensions
+        # self.conv1 = nn.Conv2d(1, 300, (19, ?), stride=(1, 1), padding=(9, 0))
+        # self.conv2 = nn.Conv2d(300, 200, (11, 1), stride=(1, 1), padding=(?, 0))
+        # self.conv3 = nn.Conv2d(200, 200, (7, 1), stride=(1, 1), padding=(4, 0))
 
         self.bn1 = nn.BatchNorm2d(300)
-        self.bn2 = nn.BatchNorm2d(?)
+        self.bn2 = nn.BatchNorm2d(200)
         self.bn3 = nn.BatchNorm2d(200)
         self.maxpool1 = nn.MaxPool2d((3, 1))
-        self.maxpool2 = nn.MaxPool2d((?, 1))
-        self.maxpool3 = nn.MaxPool2d((?, 1))
+        self.maxpool2 = nn.MaxPool2d((4, 1))
+        self.maxpool3 = nn.MaxPool2d((4, 1))
 
-        self.fc1 = nn.Linear(13*200, ?)
-        self.bn4 = nn.BatchNorm1d(?)
+        # TODO hbn4 and bn5 needed?
+        self.fc1 = nn.Linear(13*200, 1000)
+        self.bn4 = nn.BatchNorm1d(1000)
 
-        self.fc2 = nn.Linear(1000, ?)
-        self.bn5 = nn.BatchNorm1d(?)
+        self.fc2 = nn.Linear(1000, 1000)
+        self.bn5 = nn.BatchNorm1d(1000)
 
-        self.fc3 = nn.Linear(?, self.num_cell_types)
+        self.fc3 = nn.Linear(1000, self.num_cell_types)
 
     def forward(self, x):
 
-        # WRITE CODE HERE
-        return 0
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.maxpool1(x)
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.maxpool2(x)
+
+        x = self.conv3(x)
+        x = self.bn3(x)
+        x = F.relu(x)
+        x = self.maxpool3(x)
+
+        x = self.fc1(x.view(x.shape[0], -1))
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.dropout(x)
+
+        output = self.fc3(x)
+
+        return output
 
 
 def compute_fpr_tpr(y_true, y_pred):
@@ -146,7 +174,20 @@ def compute_fpr_tpr(y_true, y_pred):
     """
     output = {'fpr': 0., 'tpr': 0.}
 
-    # WRITE CODE HERE
+    # True positives 
+    tp = np.sum(np.logical_and(y_pred == 1, y_true == 1))
+ 
+    # True negatives 
+    tn = np.sum(np.logical_and(y_pred == 0, y_true == 0))
+ 
+    # False positives 
+    fp = np.sum(np.logical_and(y_pred == 1, y_true == 0))
+     
+    # False negatives 
+    fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
+
+    output['tpr'] = tp / (tp + fn)
+    output['fpr'] = fp / (tn + fp)
 
     return output
 
@@ -167,7 +208,17 @@ def compute_fpr_tpr_dumb_model():
     """
     output = {'fpr_list': [], 'tpr_list': []}
 
-    # WRITE CODE HERE
+    # Sample 1000 data points and 1000 targets 
+    samples = np.random.uniform(size=1000)
+    labels = np.random.randint(0, high=2, size=1000)
+    
+    # Compute fpr and tpr for each k value
+    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    for k in k_list:
+        y_pred = samples > k
+        results = compute_fpr_tpr(labels, y_pred.astype(int))
+        output['fpr_list'].append(results['fpr'])
+        output['tpr_list'].append(results['tpr'])
 
     return output
 
@@ -187,7 +238,24 @@ def compute_fpr_tpr_smart_model():
     """
     output = {'fpr_list': [], 'tpr_list': []}
 
-    # WRITE CODE HERE
+    # Sample 1000 targets 
+    labels = np.random.randint(0, high=2, size=1000)
+
+    # Sample data according to target
+    samples = np.zeros(labels.shape)
+    for i in range(samples.shape[0]):
+        if labels[i] == 1:
+            samples[i] = np.random.uniform(low=0.6, high=1.0)
+        else:
+            samples[i] = np.random.uniform(low=0.0, high=0.4)
+    
+    # Compute fpr and tpr for each k value
+    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    for k in k_list:
+        y_pred = samples > k
+        results = compute_fpr_tpr(labels, y_pred.astype(int))
+        output['fpr_list'].append(results['fpr'])
+        output['tpr_list'].append(results['tpr'])
 
     return output
 
@@ -202,7 +270,24 @@ def compute_auc_both_models():
     """
     output = {'auc_dumb_model': 0., 'auc_smart_model': 0.}
 
-    # WRITE CODE HERE
+    # Sample 1000 targets 
+    labels = np.random.randint(0, high=2, size=1000)
+
+    # Sample data 
+    dumb_samples = np.random.uniform(size=1000)
+    smart_samples = np.zeros(labels.shape)
+    for i in range(smart_samples.shape[0]):
+        if labels[i] == 1:
+            smart_samples[i] = np.random.uniform(low=0.6, high=1.0)
+        else:
+            smart_samples[i] = np.random.uniform(low=0.0, high=0.4)
+
+    # Compute AUC
+    k = 0.5
+    smart_preds = smart_samples > 0.5
+    dumb_preds = dumb_samples > 0.5
+    output['auc_smart_model'] = compute_auc(labels, smart_preds.astype(int))
+    output['auc_dumb_model'] = compute_auc(labels, dumb_preds.astype(int))
 
     return output
 
@@ -222,6 +307,7 @@ def compute_auc_untrained_model(model, dataloader, device):
     output = {'auc': 0.}
 
     # WRITE CODE HERE
+    breakpoint()
 
     return output
 
@@ -236,8 +322,10 @@ def compute_auc(y_true, y_model):
     """
     output = {'auc': 0.}
 
-    # WRITE CODE HERE
-
+    # TODO: actually compute auc
+    # return mAP for now
+    output['auc'] = np.sum(np.equal(y_model, y_true)) / y_model.shape[0]
+ 
     return output
 
 
@@ -248,6 +336,7 @@ def get_critereon():
     """
 
     # WRITE CODE HERE
+    breakpoint()
 
     return critereon
 
@@ -274,6 +363,7 @@ def train_loop(model, train_dataloader, device, optimizer, criterion):
               'total_loss': 0.}
 
     # WRITE CODE HERE
+    breakpoint()
 
     return output['total_score'], output['total_loss']
 
@@ -300,5 +390,6 @@ def valid_loop(model, valid_dataloader, device, optimizer, criterion):
               'total_loss': 0.}
 
     # WRITE CODE HERE
+    breakpoint()
 
     return output['total_score'], output['total_loss']

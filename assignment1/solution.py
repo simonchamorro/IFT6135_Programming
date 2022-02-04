@@ -312,15 +312,18 @@ def compute_auc_untrained_model(model, dataloader, device):
     y_true = []
     for data in dataloader:
         pred = model(data['sequence'].to(device))
-        pred = F.sigmoid()
-
-        # TODO Save preds and targets
+        pred = torch.sigmoid(pred)
+        pred_np = pred.view(-1).detach().cpu().numpy()
+        true = data['target'].view(-1).cpu().numpy()
+        y_pred_batch = pred_np > 0.5
+        y_pred.extend(y_pred_batch.astype(np.int))
+        y_true.extend(true)
         
         num_batches += 1
         if num_batches >= 100:
             break
 
-        breakpoint()
+    output = compute_auc(np.array(y_true), np.array(y_pred))
 
     return output
 
@@ -348,9 +351,7 @@ def get_critereon():
     criterion should be subclass of torch.nn
     """
 
-    # WRITE CODE HERE
-    breakpoint()
-
+    critereon = nn.BCEWithLogitsLoss()
     return critereon
 
 

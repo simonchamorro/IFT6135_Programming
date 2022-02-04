@@ -93,6 +93,44 @@ def main():
     
     out = solution.compute_auc_both_models()
     out = solution.compute_auc_untrained_model(model, basset_dataloader_test, device)
+    print('AUC before training', out['auc'])
+
+    ########################################################################
+
+    # QUESTION 4
+
+    ########################################################################
+
+    criterion = solution.get_critereon()
+
+    optimizer = optim.Adam(list(model.parameters()), lr=learning_rate, betas=(0.9, 0.999))
+
+    valid_score_best = 0
+    patience = 2
+    num_epochs = 5  # you don't need to train this for that long!
+
+    for e in range(num_epochs):
+        train_score, train_loss = solution.train_loop(model, basset_dataloader_train, device, optimizer, criterion)
+        valid_score, valid_loss = solution.valid_loop(model, basset_dataloader_valid, device, optimizer, criterion)
+
+        print('epoch {}: loss={:.3f} score={:.3f}'.format(e,
+                                                          valid_loss,
+                                                          valid_score))
+
+        if valid_score > valid_score_best:
+            print('Best score: {}. Saving model...'.format(valid_score))
+            torch.save(model, 'model_params.pt')
+            valid_score_best = valid_score
+        else:
+            patience -= 1
+            print('Score did not improve! {} <= {}. Patience left: {}'.format(valid_score,
+                                                                              valid_score_best,
+                                                                              patience))
+        if patience == 0:
+            print('patience reduced to 0. Training Finished.')
+            break
+
+    breakpoint()
 
 if __name__ == '__main__':
     main()

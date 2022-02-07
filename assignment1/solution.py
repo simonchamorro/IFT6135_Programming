@@ -76,8 +76,8 @@ class BassetDataset(Dataset):
 
         # Get items
         seq = np.swapaxes(self.inputs[idx], 0, 1).astype(np.float32)
-        output['sequence'] = np.swapaxes(seq, 1, 2)
-        output['target'] = self.outputs[idx]
+        output['sequence'] = torch.from_numpy(np.swapaxes(seq, 1, 2))
+        output['target'] = torch.from_numpy(self.outputs[idx].astype(np.float32))
 
         return output
 
@@ -88,17 +88,13 @@ class BassetDataset(Dataset):
         """
         Answer to Q1 part 2
         """
-        # WRITE CODE HERE
-        breakpoint()
-        return 0
+        return self.inputs[0].shape[-1]
 
     def is_equivalent(self):
         """
         Answer to Q1 part 3
         """
-        # WRITE CODE HERE
-        breakpoint()
-        return 0
+        return True
 
 
 class Basset(nn.Module):
@@ -111,11 +107,13 @@ class Basset(nn.Module):
     def __init__(self):
         super(Basset, self).__init__()
 
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = 0.3
+        self.dropout_layer1 = nn.Dropout(p=self.dropout)
+        self.dropout_layer2 = nn.Dropout(p=self.dropout)
         self.num_cell_types = 164
 
         self.conv1 = nn.Conv2d(1, 300, (19, 4), stride=(1, 1), padding=(9, 0))
-        self.conv2 = nn.Conv2d(300, 200, (11, 1), stride=(1, 1), padding=(6, 0))
+        self.conv2 = nn.Conv2d(300, 200, (11, 1), stride=(1, 1), padding=(5, 0))
         self.conv3 = nn.Conv2d(200, 200, (7, 1), stride=(1, 1), padding=(4, 0))
 
         self.bn1 = nn.BatchNorm2d(300)
@@ -125,7 +123,6 @@ class Basset(nn.Module):
         self.maxpool2 = nn.MaxPool2d((4, 1))
         self.maxpool3 = nn.MaxPool2d((4, 1))
 
-        # TODO hbn4 and bn5 needed?
         self.fc1 = nn.Linear(13*200, 1000)
         self.bn4 = nn.BatchNorm1d(1000)
 
@@ -151,12 +148,14 @@ class Basset(nn.Module):
         x = self.maxpool3(x)
 
         x = self.fc1(x.view(x.shape[0], -1))
+        x = self.bn4(x)
         x = F.relu(x)
-        x = self.dropout(x)
+        x = self.dropout_layer1(x)
 
         x = self.fc2(x)
+        x = self.bn5(x)
         x = F.relu(x)
-        x = self.dropout(x)
+        x = self.dropout_layer2(x)
 
         output = self.fc3(x)
 
@@ -245,9 +244,9 @@ def compute_fpr_tpr_smart_model():
     samples = np.zeros(labels.shape)
     for i in range(samples.shape[0]):
         if labels[i] == 1:
-            samples[i] = np.random.uniform(low=0.6, high=1.0)
+            samples[i] = np.random.uniform(low=0.4, high=1.0)
         else:
-            samples[i] = np.random.uniform(low=0.0, high=0.4)
+            samples[i] = np.random.uniform(low=0.0, high=0.6)
     
     # Compute fpr and tpr for each k value
     k_list = np.linspace(0, 1, num=21, endpoint=True)
@@ -278,9 +277,9 @@ def compute_auc_both_models():
     smart_samples = np.zeros(labels.shape)
     for i in range(smart_samples.shape[0]):
         if labels[i] == 1:
-            smart_samples[i] = np.random.uniform(low=0.6, high=1.0)
+            smart_samples[i] = np.random.uniform(low=0.4, high=1.0)
         else:
-            smart_samples[i] = np.random.uniform(low=0.0, high=0.4)
+            smart_samples[i] = np.random.uniform(low=0.0, high=0.6)
 
     # Compute AUC
     k = 0.5
@@ -340,6 +339,8 @@ def compute_auc(y_true, y_model):
 
     # TODO: actually compute auc
     # return mAP for now
+    # print('compute auc')
+    # print(y_true, y_model)
     output['auc'] = np.sum(np.equal(y_model, y_true)) / y_model.shape[0]
  
     return output
@@ -375,10 +376,41 @@ def train_loop(model, train_dataloader, device, optimizer, criterion):
 
     output = {'total_score': 0.,
               'total_loss': 0.}
+    
+    # Set model in train mode
+    model.train()
 
-    # WRITE CODE HERE
-    breakpoint()
+    # Iterate through dataloader
+    counter = 0
+    batch_counter = 0
+    for batch in train_dataloader:
+        optimizer.zero_grad()
 
+        x = batch['sequence'].to(device)
+        pred = model(x)
+        y = batch['target'].to(device).type_as(pred)
+        loss = criterion(pred, y)
+        loss.backward()
+        optimizer.step()
+
+        y_pred = torch.sigmoid(pred)
+        pred_np = y_pred.view(-1).detach().cpu().numpy()
+        true = y.view(-1).cpu().numpy()
+        y_pred_batch = pred_np > 0.5
+        
+        # Compute AUC score
+        auc = compute_auc(true, y_pred_batch.astype(np.int))['auc']
+        output['total_score'] += auc
+
+        # Sum loss
+        n = y.size(0)
+        batch_loss = loss.sum().data.cpu().numpy() * n
+        output['total_loss'] += batch_loss
+
+        counter += n
+        batch_counter += 1
+
+    output['total_score'] = output['total_score'] / batch_counter
     return output['total_score'], output['total_loss']
 
 
@@ -403,7 +435,34 @@ def valid_loop(model, valid_dataloader, device, optimizer, criterion):
     output = {'total_score': 0.,
               'total_loss': 0.}
 
-    # WRITE CODE HERE
-    breakpoint()
+    # Set model in test mode
+    model.eval()
 
+    # Iterate through dataloader
+    counter = 0
+    batch_counter = 0
+    for batch in valid_dataloader:
+
+        x = batch['sequence'].to(device)
+        pred = model(x)
+        y = batch['target'].to(device).type_as(pred)
+        loss = criterion(pred, y).detach()
+        y_pred = torch.sigmoid(pred)
+        pred_np = y_pred.view(-1).detach().cpu().numpy()
+        true = y.view(-1).cpu().numpy()
+        y_pred_batch = pred_np > 0.5
+        
+        # Compute AUC score
+        auc = compute_auc(true, y_pred_batch.astype(np.int))['auc']
+        output['total_score'] += auc
+
+        # Sum loss
+        n = y.size(0)
+        batch_loss = loss.sum().data.cpu().numpy() * n
+        output['total_loss'] += batch_loss
+
+        counter += n
+        batch_counter += 1
+
+    output['total_score'] = output['total_score'] / batch_counter
     return output['total_score'], output['total_loss']

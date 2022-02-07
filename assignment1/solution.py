@@ -185,8 +185,10 @@ def compute_fpr_tpr(y_true, y_pred):
     # False negatives 
     fn = np.sum(np.logical_and(y_pred == 0, y_true == 1))
 
-    output['tpr'] = tp / (tp + fn)
-    output['fpr'] = fp / (tn + fp)
+    positives = tp + fn
+    negatives = tn + fp
+    output['tpr'] = tp / positives if positives > 0 else 0.0
+    output['fpr'] = fp / negatives if negatives > 0 else 0.0
 
     return output
 

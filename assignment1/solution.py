@@ -282,11 +282,8 @@ def compute_auc_both_models():
             smart_samples[i] = np.random.uniform(low=0.0, high=0.6)
 
     # Compute AUC
-    k = 0.5
-    smart_preds = smart_samples > 0.5
-    dumb_preds = dumb_samples > 0.5
-    output['auc_smart_model'] = compute_auc(labels, smart_preds.astype(int))
-    output['auc_dumb_model'] = compute_auc(labels, dumb_preds.astype(int))
+    output['auc_smart_model'] = compute_auc(labels, smart_samples)['auc']
+    output['auc_dumb_model'] = compute_auc(labels, dumb_samples)['auc']
 
     return output
 
@@ -312,10 +309,9 @@ def compute_auc_untrained_model(model, dataloader, device):
     for data in dataloader:
         pred = model(data['sequence'].to(device))
         pred = torch.sigmoid(pred)
-        pred_np = pred.view(-1).detach().cpu().numpy()
+        y_pred_batch = pred.view(-1).detach().cpu().numpy()
         true = data['target'].view(-1).cpu().numpy()
-        y_pred_batch = pred_np > 0.5
-        y_pred.extend(y_pred_batch.astype(np.int))
+        y_pred.extend(y_pred_batch)
         y_true.extend(true)
         
         num_batches += 1
@@ -333,16 +329,22 @@ def compute_auc(y_true, y_model):
     auc returned should be float
     Args:
         :param y_true: groundtruth labels (np.array of ints)
-        :param y_pred: model decisions (np.array of ints)
+        :param y_pred: model decisions (np.array of ints) -> array of floats between 0 and 1
     """
     output = {'auc': 0.}
 
-    # TODO: actually compute auc
-    # return mAP for now
-    # print('compute auc')
-    # print(y_true, y_model)
-    output['auc'] = np.sum(np.equal(y_model, y_true)) / y_model.shape[0]
- 
+    # Compute fpr and tpr
+    tpr = []
+    fpr = []
+    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    for k in k_list:
+        y_pred = y_model > k
+        results = compute_fpr_tpr(y_true, y_pred.astype(int))
+        fpr.append(results['fpr'])
+        tpr.append(results['tpr'])
+
+    # Conpute AUC
+    output['auc'] = np.abs(np.trapz(tpr, fpr))
     return output
 
 

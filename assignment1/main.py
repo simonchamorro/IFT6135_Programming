@@ -21,6 +21,7 @@ def main():
     learning_rate = 0.002
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cpu")
 
     # set RNG
     seed = 42
@@ -32,9 +33,9 @@ def main():
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
 
-    # unzip data
-    if not os.path.exists('er.h5'):
-        os.system('unzip er.zip')
+    # # unzip data
+    # if not os.path.exists('er.h5'):
+    #     os.system('unzip er.zip')
 
     ########################################################################
 
@@ -68,6 +69,8 @@ def main():
                                         shuffle=False,
                                         num_workers=1)
 
+    sequence_len = basset_dataset_train.get_seq_len()
+
     ########################################################################
 
     # QUESTION 2
@@ -81,17 +84,18 @@ def main():
     # QUESTION 3
 
     ########################################################################
-    out = solution.compute_fpr_tpr_dumb_model()
+    # out = solution.compute_fpr_tpr_dumb_model()
     # plt.figure()
     # plt.plot(out['fpr_list'], out['tpr_list'])
     # plt.show()
 
-    out = solution.compute_fpr_tpr_smart_model()
+    # out = solution.compute_fpr_tpr_smart_model()
     # plt.figure()
     # plt.plot(out['fpr_list'], out['tpr_list'])
     # plt.show()
     
-    out = solution.compute_auc_both_models()
+    # out = solution.compute_auc_both_models()
+
     out = solution.compute_auc_untrained_model(model, basset_dataloader_test, device)
     print('AUC before training', out['auc'])
 
@@ -130,7 +134,6 @@ def main():
             print('patience reduced to 0. Training Finished.')
             break
 
-    breakpoint()
 
 if __name__ == '__main__':
     main()

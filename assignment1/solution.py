@@ -108,8 +108,6 @@ class Basset(nn.Module):
         super(Basset, self).__init__()
 
         self.dropout = 0.3
-        self.dropout_layer1 = nn.Dropout(p=self.dropout)
-        self.dropout_layer2 = nn.Dropout(p=self.dropout)
         self.num_cell_types = 164
 
         self.conv1 = nn.Conv2d(1, 300, (19, 4), stride=(1, 1), padding=(9, 0))
@@ -150,17 +148,38 @@ class Basset(nn.Module):
         x = self.fc1(x.view(x.shape[0], -1))
         x = self.bn4(x)
         x = F.relu(x)
-        x = self.dropout_layer1(x)
+        x = F.dropout(x, training=self.training, p=self.dropout)
 
         x = self.fc2(x)
         x = self.bn5(x)
         x = F.relu(x)
-        x = self.dropout_layer2(x)
+        x = F.dropout(x, training=self.training, p=self.dropout)
 
         output = self.fc3(x)
 
         return output
 
+    def get_kernel_activation(self, x):
+        max_activations = np.zeros((300))
+        weights = self.conv1.weight
+        inp_unf = F.unfold(x, (19,4), padding=(9,0))
+        out_unf = inp_unf.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2)
+        out = out_unf.detach().cpu().numpy()
+        max_activations = np.max(np.max(out, axis=0), axis=-1)
+        return max_activations
+
+    def count(self, x, max_act, shape):
+        count = np.zeros((300, 19,4))
+        weights = self.conv1.weight
+        inp_unf = F.unfold(x, (19,4), padding=(9,0))
+        out_unf = inp_unf.transpose(1, 2).matmul(weights.view(weights.size(0), -1).t()).transpose(1, 2)
+        
+        for i in range(out_unf.shape[0]):
+            for j in range(out_unf.shape[1]):
+                for k in range(out_unf.shape[2]):
+                    if out_unf[i,j,k] > max_act[j]/2:
+                        count[j,:,:] += torch.reshape(inp_unf[i,:,k], (19,4)).detach().cpu().numpy()
+        return count
 
 def compute_fpr_tpr(y_true, y_pred):
     """
@@ -214,7 +233,7 @@ def compute_fpr_tpr_dumb_model():
     labels = np.random.randint(0, high=2, size=1000)
     
     # Compute fpr and tpr for each k value
-    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    k_list = np.linspace(0, 1, num=20, endpoint=False)
     for k in k_list:
         y_pred = samples > k
         results = compute_fpr_tpr(labels, y_pred.astype(int))
@@ -251,7 +270,7 @@ def compute_fpr_tpr_smart_model():
             samples[i] = np.random.uniform(low=0.0, high=0.6)
     
     # Compute fpr and tpr for each k value
-    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    k_list = np.linspace(0, 1, num=20, endpoint=False)
     for k in k_list:
         y_pred = samples > k
         results = compute_fpr_tpr(labels, y_pred.astype(int))
@@ -304,24 +323,20 @@ def compute_auc_untrained_model(model, dataloader, device):
     """
     output = {'auc': 0.}
 
+    model.eval()
+
     # Iterate through data and predict classes
-    num_batches = 0
     y_pred = []
     y_true = []
     for data in dataloader:
-        pred = model(data['sequence'].to(device))
-        pred = torch.sigmoid(pred)
+        y_model = model(data['sequence'].to(device))
+        pred = torch.sigmoid(y_model)
         y_pred_batch = pred.view(-1).detach().cpu().numpy()
         true = data['target'].view(-1).cpu().numpy()
         y_pred.extend(y_pred_batch)
         y_true.extend(true)
-        
-        num_batches += 1
-        if num_batches >= 100:
-            break
 
-    output = compute_auc(np.array(y_true), np.array(y_pred))
-
+    output = compute_auc(np.array(y_true, dtype=np.int), np.array(y_pred))
     return output
 
 
@@ -338,7 +353,7 @@ def compute_auc(y_true, y_model):
     # Compute fpr and tpr
     tpr = []
     fpr = []
-    k_list = np.linspace(0, 1, num=21, endpoint=True)
+    k_list = np.linspace(0, 1, num=20, endpoint=False)
     for k in k_list:
         y_pred = y_model > k
         results = compute_fpr_tpr(y_true, y_pred.astype(int))
@@ -400,10 +415,9 @@ def train_loop(model, train_dataloader, device, optimizer, criterion):
         y_pred = torch.sigmoid(pred)
         pred_np = y_pred.view(-1).detach().cpu().numpy()
         true = y.view(-1).cpu().numpy()
-        y_pred_batch = pred_np > 0.5
         
         # Compute AUC score
-        auc = compute_auc(true, y_pred_batch.astype(np.int))['auc']
+        auc = compute_auc(true, pred_np)['auc']
         output['total_score'] += auc
 
         # Sum loss
@@ -454,10 +468,9 @@ def valid_loop(model, valid_dataloader, device, optimizer, criterion):
         y_pred = torch.sigmoid(pred)
         pred_np = y_pred.view(-1).detach().cpu().numpy()
         true = y.view(-1).cpu().numpy()
-        y_pred_batch = pred_np > 0.5
         
         # Compute AUC score
-        auc = compute_auc(true, y_pred_batch.astype(np.int))['auc']
+        auc = compute_auc(true, pred_np)['auc']
         output['total_score'] += auc
 
         # Sum loss

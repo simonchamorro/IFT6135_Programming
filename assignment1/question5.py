@@ -55,6 +55,14 @@ def auc_roc(model, loader, device, title=''):
     return out['auc']
 
 
+def plot_pwm(pwm, idx, corr):
+    plt.figure()
+    plt.imshow(pwm)
+    plt.colorbar()
+    plt.title('Kernel # ' + str(idx) + ' p = ' + str(corr))
+    plt.savefig(str(idx) + '.png')
+
+
 def main():
     # The hyperparameters we will use
     batch_size = 64
@@ -130,7 +138,7 @@ def main():
     plt.imshow(ctcf)
     plt.colorbar()
     plt.title('CTCF Normalized Motif')
-    plt.show()
+    plt.savefig('ctcf.png')
     
     
     # QUESTION 5.3
@@ -167,7 +175,7 @@ def main():
     for batch in tqdm(basset_dataloader_test):
         base_pair_count += model.count(batch['sequence'].to(device), max_activations, shape)    
         i += 1
-        if i == 50:
+        if i == 300:
             break
 
     # Normalize PWMs
@@ -179,22 +187,19 @@ def main():
     # Check correlation
     correlation = np.zeros(base_pair_count.shape[0])
     for i in range(base_pair_count.shape[0]):
-        count = base_pair_count[i]
-        corr = []
-        corr.append(np.abs(np.corrcoef(ctcf[0,:], count[0,:])[1,1]))
-        corr.append(np.abs(np.corrcoef(ctcf[1,:], count[1,:])[1,1]))
-        corr.append(np.abs(np.corrcoef(ctcf[2,:], count[2,:])[1,1]))
-        corr.append(np.abs(np.corrcoef(ctcf[3,:], count[3,:])[1,1]))
-        correlation[i] = sum(corr)
+        correlation[i] = np.abs(np.corrcoef(ctcf.flatten(), base_pair_count[i].flatten())[0][1])
 
     # Keep 3 best and plot
-    best_idx = np.argsort(correlation)[-5:]
-    for idx in best_idx:
-        plt.figure()
-        plt.imshow(base_pair_count[idx])
-        plt.colorbar()
-        plt.title('Kernel # ' + str(idx))
-        plt.show()
+    best_idx = np.argsort(correlation)
+    for i in range(10):
+        idx = best_idx[-i]
+        plot_pwm(base_pair_count[idx], idx, correlation[idx])
+
+    breakpoint()
+
+
+
+
 
 
 

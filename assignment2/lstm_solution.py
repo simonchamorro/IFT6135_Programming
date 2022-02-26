@@ -40,6 +40,8 @@ class LSTM(nn.Module):
         # Freeze the embedding weights, depending on learn_embeddings
         self.embedding.requires_grad_(learn_embeddings)
 
+        self.criterion = nn.CrossEntropyLoss()
+
     def forward(self, inputs, hidden_states):
         """LSTM.
 
@@ -71,11 +73,10 @@ class LSTM(nn.Module):
             - h (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
             - c (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        pass
+        x = self.embedding(inputs)
+        x, hidden_states = self.lstm(x, hidden_states)
+        out = self.classifier(x)
+        return out, hidden_states
 
     def loss(self, log_probas, targets, mask):
         """Loss function.
@@ -102,11 +103,11 @@ class LSTM(nn.Module):
         loss (`torch.FloatTensor` scalar)
             The scalar loss, corresponding to the (mean) negative log-likelihood.
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        pass
+        # TODO: compute loss according to formula
+        pred = torch.reshape(log_probas, (log_probas.shape[0]*log_probas.shape[1], log_probas.shape[-1]))
+        target = torch.reshape(targets, (targets.shape[0]*targets.shape[1],))
+        loss = self.criterion(pred, target)
+        return loss
 
     def initial_states(self, batch_size, device=None):
         if device is None:

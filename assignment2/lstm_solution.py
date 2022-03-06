@@ -40,7 +40,7 @@ class LSTM(nn.Module):
         # Freeze the embedding weights, depending on learn_embeddings
         self.embedding.requires_grad_(learn_embeddings)
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.NLLLoss(reduction='none')
 
     def forward(self, inputs, hidden_states):
         """LSTM.
@@ -73,10 +73,18 @@ class LSTM(nn.Module):
             - h (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
             - c (`torch.FloatTensor` of shape `(num_layers, batch_size, hidden_size)`)
         """
+        # Embed input 
         x = self.embedding(inputs)
+        
+        # Pass through lstm
         x, hidden_states = self.lstm(x, hidden_states)
+        
+        # Pass through classifier
         out = self.classifier(x)
-        return out, hidden_states
+        
+        # Return log probabilities and hidden state
+        log_probas = F.log_softmax(out, 2)
+        return log_probas, hidden_states
 
     def loss(self, log_probas, targets, mask):
         """Loss function.
@@ -103,10 +111,13 @@ class LSTM(nn.Module):
         loss (`torch.FloatTensor` scalar)
             The scalar loss, corresponding to the (mean) negative log-likelihood.
         """
-        # TODO: compute loss according to formula
-        pred = torch.reshape(log_probas, (log_probas.shape[0]*log_probas.shape[1], log_probas.shape[-1]))
-        target = torch.reshape(targets, (targets.shape[0]*targets.shape[1],))
-        loss = self.criterion(pred, target)
+        # Negative log likelihood
+        shape = log_probas.shape 
+        neg_ll = self.criterion(log_probas.view(shape[0]*shape[1], shape[2]), targets.reshape(-1))
+
+        # Loss
+        masked_loss = neg_ll.view(shape[0], shape[1]) * mask / mask.sum(1, keepdim=True)
+        loss = masked_loss.sum() / shape[0]
         return loss
 
     def initial_states(self, batch_size, device=None):

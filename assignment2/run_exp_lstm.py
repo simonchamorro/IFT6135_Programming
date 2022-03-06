@@ -20,13 +20,13 @@ from utils.data_utils import save_logs
 """
 # Configs to run
 
-1. python run_exp.py --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer adam
-2. python run_exp.py --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer adamw
-3. python run_exp.py --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer sgd
-4. python run_exp.py --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer momentum
+1. python run_exp_lstm.py --exp_id l1_b16_adam      --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer adam
+2. python run_exp_lstm.py --exp_id l1_b16_adamw     --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer adamw
+3. python run_exp_lstm.py --exp_id l1_b16_sgd       --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer sgd
+4. python run_exp_lstm.py --exp_id l1_b16_momentum  --model lstm --layers 1 --batch_size 16 --log --epochs 10 --optimizer momentum
 
-5. python run_exp.py --model lstm --layers 2 --batch_size 16 --log --epochs 10 --optimizer adamw
-6. python run_exp.py --model lstm --layers 4 --batch_size 16 --log --epochs 10 --optimizer adamw
+5. python run_exp_lstm.py --exp_id l2_b16_adamw     --model lstm --layers 2 --batch_size 16 --log --epochs 10 --optimizer adamw
+6. python run_exp_lstm.py --exp_id l4_b16_adamw     --model lstm --layers 4 --batch_size 16 --log --epochs 10 --optimizer adamw
 
 """
 

@@ -24,14 +24,14 @@ from utils.torch_utils import seed_experiment, to_device
 """
 # Configs to run
 
-1. python run_exp.py --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adam
-2. python run_exp.py --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adamw
-3. python run_exp.py --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer sgd
-4. python run_exp.py --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer momentum
+1. python run_exp_vit.py --exp_id vit_l2_b128_adam      --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adam
+2. python run_exp_vit.py --exp_id vit_l2_b128_adamw     --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adamw
+3. python run_exp_vit.py --exp_id vit_l2_b128_sgd       --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer sgd
+4. python run_exp_vit.py --exp_id vit_l2_b128_momentum  --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer momentum
 
-5. python run_exp.py --model vit --layers 4 --batch_size 128 --epochs 10 --optimizer adamw
-6. python run_exp.py --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw 
-7. python run_exp.py --model vit --layers 6 --batch_size 128  --epochs 10 --optimizer adamw --block postnorm
+5. python run_exp_vit.py --exp_id vit_l4_b128_adamw             --model vit --layers 4 --batch_size 128 --epochs 10 --optimizer adamw
+6. python run_exp_vit.py --exp_id vit_l6_b128_adamw             --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw 
+7. python run_exp_vit.py --exp_id vit_l6_b128_adamw_postnorm    --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw --block postnorm
 
 """
 
@@ -152,7 +152,7 @@ def main(args):
     # Model
     if args.model == "vit":
         model = VisionTransformer(
-            num_layers=args.num_layers, block=args.block)
+            num_layers=args.layers, block=args.block)
     else:
         raise ValueError("Unknown model {0}".format(args.model))
     model.to(args.device)

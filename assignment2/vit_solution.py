@@ -35,11 +35,9 @@ class LayerNorm(nn.Module):
         outputs (`torch.FloatTensor` of shape `(*dims, hidden_size)`)
             The output tensor, having the same shape as `inputs`.
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        pass
+        x = inputs - torch.mean(inputs, dim=-1, keepdim=True)
+        x = x / torch.sqrt(torch.var(inputs, dim=-1, keepdim=True, unbiased=False) + self.eps)
+        return x * self.weight + self.bias
 
     def reset_parameters(self):
         nn.init.ones_(self.weight)
@@ -99,7 +97,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()
 
     def apply_attention(self, queries, keys, values):
         """Apply the attention.
@@ -152,7 +150,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()
 
     def split_heads(self, tensor):
         """Split the head vectors.
@@ -181,7 +179,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()
 
     def merge_heads(self, tensor):
         """Merge the head vectors.
@@ -209,7 +207,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()
 
     def forward(self, hidden_states):
         """Multi-headed attention.
@@ -246,7 +244,7 @@ class MultiHeadedAttention(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()
 
 class PostNormAttentionBlock(nn.Module):
     
@@ -275,9 +273,7 @@ class PostNormAttentionBlock(nn.Module):
         
         
     def forward(self, x):
-       
         attention_outputs = self.attn(x)
-        #print(inp_x.shape)
         attention_outputs = self.layer_norm_1(x + attention_outputs)
         outputs=self.linear(attention_outputs)
 
@@ -316,10 +312,14 @@ class PreNormAttentionBlock(nn.Module):
         
         
     def forward(self, x):
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        pass
+        attn_output = self.layer_norm_1(x)
+        attn_output = self.attn(attn_output)
+
+        x = x + attn_output
+        x = self.layer_norm_2(x)
+        x = self.linear(x)
+
+        return x + attn_output
 
 
 
@@ -373,10 +373,19 @@ class VisionTransformer(nn.Module):
                               as a feature vector instead of a image grid.
         Output : torch.Tensor representing the sequence of shape [B,patches,patch_size*patch_size] for flattened.
         """
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        pass
+        b = image.shape[0]
+        c = image.shape[1]
+        h = image.shape[2]
+        w = image.shape[3]
+
+        patches = F.unfold(image, patch_size, stride=patch_size)
+        patches = torch.swapaxes(patches, 1, 2)
+
+        if not flatten_channels:
+            patches = patches.reshape(b, patches.shape[1], 
+                                      c, patch_size*patch_size)
+
+        return patches
 
 
     def forward(self, x):
@@ -405,22 +414,14 @@ class VisionTransformer(nn.Module):
         x = x + self.pos_embedding[:,:T+1]
         
         #Add dropout and then the transformer
-        
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        
+        x = self.dropout(x)
+        x = self.transformer(x)
 
         #Take the cls token representation and send it to mlp_head
+        x = x[:, 0]
+        return self.mlp_head(x)
+        
 
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        
-        
-    
-        
-        pass
     def loss(self,preds,labels):
         '''Loss function.
 
@@ -433,4 +434,4 @@ class VisionTransformer(nn.Module):
         # ==========================
         # TODO: Write your code here
         # ==========================
-        pass
+        breakpoint()

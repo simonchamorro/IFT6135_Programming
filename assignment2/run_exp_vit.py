@@ -7,6 +7,7 @@ import torch
 import urllib.request
 import numpy as np
 import torch.optim as optim
+import subprocess as sp
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -19,19 +20,19 @@ from torchvision import transforms
 from vit_solution import VisionTransformer
 
 from utils.torch_utils import seed_experiment, to_device
-#from utils.data_utils import save_logs
+from utils.data_utils import save_logs
 
 """
 # Configs to run
 
-1. python run_exp_vit.py --exp_id vit_l2_b128_adam      --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adam
-2. python run_exp_vit.py --exp_id vit_l2_b128_adamw     --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adamw
-3. python run_exp_vit.py --exp_id vit_l2_b128_sgd       --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer sgd
-4. python run_exp_vit.py --exp_id vit_l2_b128_momentum  --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer momentum
+1. python run_exp_vit.py --log --exp_id vit_l2_b128_adam      --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adam
+2. python run_exp_vit.py --log --exp_id vit_l2_b128_adamw     --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer adamw
+3. python run_exp_vit.py --log --exp_id vit_l2_b128_sgd       --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer sgd
+4. python run_exp_vit.py --log --exp_id vit_l2_b128_momentum  --model vit --layers 2 --batch_size 128 --epochs 10 --optimizer momentum
 
-5. python run_exp_vit.py --exp_id vit_l4_b128_adamw             --model vit --layers 4 --batch_size 128 --epochs 10 --optimizer adamw
-6. python run_exp_vit.py --exp_id vit_l6_b128_adamw             --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw 
-7. python run_exp_vit.py --exp_id vit_l6_b128_adamw_postnorm    --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw --block postnorm
+5. python run_exp_vit.py --log --exp_id vit_l4_b128_adamw             --model vit --layers 4 --batch_size 128 --epochs 10 --optimizer adamw
+6. python run_exp_vit.py --log --exp_id vit_l6_b128_adamw             --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw 
+7. python run_exp_vit.py --log --exp_id vit_l6_b128_adamw_postnorm    --model vit --layers 6 --batch_size 128 --epochs 10 --optimizer adamw --block postnorm
 
 """
 
@@ -181,10 +182,11 @@ def main(args):
         f"total parameters, of which {sum(p.numel() for p in model.parameters() if p.requires_grad)} are learnable."
     )
 
+    gpu_usage = []
     train_losses, valid_losses = [], []
     train_accs, valid_accs = [], []
     train_times, valid_times = [], []
-    for epoch in range(10):
+    for epoch in range(args.epochs):
 
         tqdm.write(f"====== Epoch {epoch} ======>")
 
@@ -197,6 +199,12 @@ def main(args):
         valid_losses.append(loss)
         valid_accs.append(acc)
         valid_times.append(wall_time)
+
+        # Check gpu memory usage
+        output_to_list = lambda x: x.decode('ascii').split('\n')[:-1]
+        COMMAND = "nvidia-smi --query-gpu=memory.used --format=csv"
+        memory_use_info = output_to_list(sp.check_output(COMMAND.split(),stderr=sp.STDOUT))[1:]
+        gpu_usage.extend(memory_use_info)
 
     test_loss, test_acc, test_time = evaluate(
         epoch, model, test_dataloader, args, mode="test"
@@ -214,6 +222,7 @@ def main(args):
         test_loss,
         test_acc,
         test_time,
+        gpu_usage,
     )
 
 
@@ -350,4 +359,5 @@ if __name__ == "__main__":
         )
 
     logs = main(args)
-    #Reuse the save logs function in utils to your needs if needed.
+    if args.log is not None:
+        save_logs(args, *logs)

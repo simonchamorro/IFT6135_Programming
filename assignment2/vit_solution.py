@@ -51,9 +51,11 @@ class MultiHeadedAttention(nn.Module):
         self.num_heads = num_heads
         self.sequence_length = sequence_length
 
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
+        # Initialize weights
+        self.linear_Q = nn.Linear(num_heads*head_size,num_heads*head_size, bias=True)
+        self.linear_K = nn.Linear(num_heads*head_size,num_heads*head_size, bias=True)
+        self.linear_V = nn.Linear(num_heads*head_size,num_heads*head_size, bias=True)
+        self.linear_O = nn.Linear(num_heads*head_size,num_heads*head_size, bias=True)
 
     def get_attention_weights(self, queries, keys):
         """Compute the attention weights.
@@ -93,11 +95,11 @@ class MultiHeadedAttention(nn.Module):
             model here, `attention_weights[1, 3, 5, 7] == 0`, since the 8th token
             should not influence on the 6th token (7 > 5).
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        b, num_heads, seq_len, head_size = queries.shape
+        
+        interaction_scores = torch.matmul(queries, keys.transpose(-2, -1)) / np.sqrt(head_size) 
+        attention_weights = F.softmax(interaction_scores, dim=-1)       
+        return attention_weights
 
     def apply_attention(self, queries, keys, values):
         """Apply the attention.
@@ -146,11 +148,9 @@ class MultiHeadedAttention(nn.Module):
             (concatenated for all heads) for the 3rd token (index 2) of the 1st
             sequence in the batch (index 0).
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        attention_weights = self.get_attention_weights(queries, keys)
+        x = torch.matmul(attention_weights, values)
+        return self.merge_heads(x) 
 
     def split_heads(self, tensor):
         """Split the head vectors.
@@ -176,10 +176,9 @@ class MultiHeadedAttention(nn.Module):
             definition of the input `tensor` above.
         """
 
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        b, seq_len, num_heads_dim = tensor.shape
+        
+        return tensor.reshape(b, seq_len, self.num_heads, int(num_heads_dim/self.num_heads)).permute(0,2,1,3)
 
     def merge_heads(self, tensor):
         """Merge the head vectors.
@@ -203,11 +202,11 @@ class MultiHeadedAttention(nn.Module):
             vectors. Here `dim` is the same dimension as the one in the
             definition of the input `tensor` above.
         """
-
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        b, num_heads, seq_len, dim = tensor.shape
+        
+        x = tensor.permute((0,2,1,3))
+        
+        return x.reshape(b, seq_len, num_heads*dim)
 
     def forward(self, hidden_states):
         """Multi-headed attention.
@@ -241,10 +240,13 @@ class MultiHeadedAttention(nn.Module):
             sequences in the batch, and all positions in each sequence.
         """
 
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        Q = self.split_heads( self.linear_Q(hidden_states) )
+        K = self.split_heads( self.linear_K(hidden_states) )
+        V = self.split_heads( self.linear_V(hidden_states) )
+
+        x = self.apply_attention(Q, K, V)
+        x = self.linear_O(x)
+        return x
 
 class PostNormAttentionBlock(nn.Module):
     
@@ -275,9 +277,9 @@ class PostNormAttentionBlock(nn.Module):
     def forward(self, x):
         attention_outputs = self.attn(x)
         attention_outputs = self.layer_norm_1(x + attention_outputs)
-        outputs=self.linear(attention_outputs)
+        outputs = self.linear(attention_outputs)
 
-        outputs = self.layer_norm_2(outputs+attention_outputs)
+        outputs = self.layer_norm_2(outputs + attention_outputs)
         return outputs
 
 class PreNormAttentionBlock(nn.Module):
@@ -314,12 +316,12 @@ class PreNormAttentionBlock(nn.Module):
     def forward(self, x):
         attn_output = self.layer_norm_1(x)
         attn_output = self.attn(attn_output)
+        x1 = x + attn_output
 
-        x = x + attn_output
-        x = self.layer_norm_2(x)
-        x = self.linear(x)
+        x2 = self.layer_norm_2(x1)
+        x2 = self.linear(x2)
 
-        return x + attn_output
+        return x1 + x2
 
 
 
@@ -363,7 +365,10 @@ class VisionTransformer(nn.Module):
         # Parameters/Embeddings
         self.cls_token = nn.Parameter(torch.randn(1,1,embed_dim))
         self.pos_embedding = nn.Parameter(torch.randn(1,self.sequence_length,embed_dim))
-    
+        
+        # Criterion
+        self.criterion = nn.CrossEntropyLoss()
+
     def get_patches(self,image, patch_size, flatten_channels=True):
         """
         Inputs:
@@ -373,10 +378,7 @@ class VisionTransformer(nn.Module):
                               as a feature vector instead of a image grid.
         Output : torch.Tensor representing the sequence of shape [B,patches,patch_size*patch_size] for flattened.
         """
-        b = image.shape[0]
-        c = image.shape[1]
-        h = image.shape[2]
-        w = image.shape[3]
+        b, c, h, w = image.shape
 
         patches = F.unfold(image, patch_size, stride=patch_size)
         patches = torch.swapaxes(patches, 1, 2)
@@ -431,7 +433,4 @@ class VisionTransformer(nn.Module):
             labels- True labels of the dataset
 
         '''
-        # ==========================
-        # TODO: Write your code here
-        # ==========================
-        breakpoint()
+        return self.criterion(preds, labels)

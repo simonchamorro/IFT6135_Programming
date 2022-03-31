@@ -195,21 +195,6 @@ def main():
         idx = best_idx[-i]
         plot_pwm(base_pair_count[idx], idx, correlation[idx])
 
-    breakpoint()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == '__main__':

@@ -1,6 +1,8 @@
 .ipynb_checkpoints/
 assignment1/er.zip
 assignment1/er.h5
+assignment2/logs
+assignment2/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -60,6 +60,9 @@ class SimSiam(nn.Module):
         else:
             pass
 
+        self.cos = CosineSimilarity(dim=1, eps=1e-6)
+
+
     def forward(self, x1, x2):
         """
         Input:
@@ -74,6 +77,18 @@ class SimSiam(nn.Module):
         COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
         Note that the outputs are differnt if stop_gradient is True or False
         """
+        z1 = self.encoder(x1)
+        z2 = self.encoder(x2)
+
+        p1 = self.predictor(z1)
+        p2 = self.predictor(z2)
+
+        if self.stop_gradient:
+            z1 = z1.detach()
+            z2 = z2.detach()
+
+        return p1, p2, z1, z2 
+
 
     def loss (self, p1,p2,z1,z2, similarity_function='CosineSimilarity'):
         """ 
@@ -85,6 +100,8 @@ class SimSiam(nn.Module):
         """
         COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
         """
+        return -(self.cos(p1, z2).mean() + self.cos(p2, z1).mean()) * 0.5
+
 
 # you might need this function when implementing CosineSimilarity forward function
 def bdot(a, b):
@@ -92,6 +109,7 @@ def bdot(a, b):
     B = a.shape[0]
     S = a.shape[1]
     return torch.bmm(a.view(B, 1, S), b.view(B, S, 1)).reshape(-1)
+
 
 class CosineSimilarity(Module):
     r"""Returns cosine similarity between :math:`x_1` and :math:`x_2`, computed along `dim`.
@@ -131,3 +149,8 @@ class CosineSimilarity(Module):
         """
         COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
         """
+        numerator = bdot(x1, x2)
+        denom = torch.norm(x1, p=2) * torch.norm(x2, p=2)
+        denom = denom if denom > self.eps else self.eps
+        similarity = numerator / denom
+        return similarity

@@ -4,6 +4,8 @@ assignment1/er.h5
 assignment2/logs
 assignment2/data
 assignment3/binarized_mnist
+assignment3/*.mat
+assignment3/imgs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

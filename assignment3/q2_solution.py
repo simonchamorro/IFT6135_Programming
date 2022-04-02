@@ -3,10 +3,11 @@ from q2_sampler import svhn_sampler
 from q2_model import Critic, Generator
 from torch import optim
 from torchvision.utils import save_image
+from tqdm import tqdm
 
 
 
-def lp_reg(x, y, critic):
+def lp_reg(x, y, critic, device):
     """
     COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
 
@@ -20,7 +21,18 @@ def lp_reg(x, y, critic):
     :param critic: (Module) - torch module that you want to regularize.
     :return: (FloatTensor) - shape: (1,) - Lipschitz penalty
     """
-    pass
+    t = torch.rand(x.size(), device=device)
+
+    x_hat = t*x + (1 - t)*y
+    f_x = critic(x_hat)
+    grad = torch.autograd.grad(f_x, x_hat, 
+                               retain_graph=True, 
+                               create_graph=True, 
+                               grad_outputs=torch.ones_like(f_x))[0]
+
+    grad_norm = torch.norm(grad, p=2, dim=-1)
+    lp = torch.nn.functional.relu(grad_norm - 1) **2
+    return lp.mean()
 
 
 def vf_wasserstein_distance(p, q, critic):
@@ -37,8 +49,7 @@ def vf_wasserstein_distance(p, q, critic):
     :param critic: (Module) - torch module used to compute the Wasserstein distance
     :return: (FloatTensor) - shape: (1,) - Estimate of the Wasserstein distance
     """
-    pass
-
+    return critic(p).mean() - critic(q).mean()
 
 
 if __name__ == '__main__':
@@ -67,7 +78,7 @@ if __name__ == '__main__':
     train_iter = iter(train_loader)
     valid_iter = iter(valid_loader)
     test_iter = iter(test_loader)
-    for i in range(n_iter):
+    for i in tqdm(range(n_iter)):
         generator.train()
         critic.train()
         for _ in range(n_critic_updates):
@@ -76,19 +87,27 @@ if __name__ == '__main__':
             except Exception:
                 train_iter = iter(train_loader)
                 data = next(train_iter)[0].to(device)
-            #####
-            # train the critic model here
-            #####
+            
+            z = torch.randn(train_batch_size, z_dim, device=device)
+            gen_data = generator(z)
 
-        #####
-        # train the generator model here
-        #####
+            # Train loss
+            optim_critic.zero_grad()
+            loss_critic = -vf_wasserstein_distance(data, gen_data, critic) + lp_coeff*lp_reg(data, gen_data, critic, device)
+            loss_critic.backward()
+            optim_critic.step()
+
+        # Train loss
+        optim_generator.zero_grad()
+        gen_data = generator(z)
+        loss_gen = -torch.mean(critic(gen_data))
+        loss_gen.backward()
+        optim_generator.step()
 
         # Save sample images 
         if i % 100 == 0:
             z = torch.randn(64, z_dim, device=device)
             imgs = generator(z)
-            save_image(imgs, f'imgs_{i}.png', normalize=True, value_range=(-1, 1))
-
+            save_image(imgs, f'./imgs/imgs_{i}.png', normalize=True, value_range=(-1, 1))
 
     # COMPLETE QUALITATIVE EVALUATION

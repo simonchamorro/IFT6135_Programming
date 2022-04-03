@@ -53,9 +53,12 @@ def vf_wasserstein_distance(p, q, critic):
 
 
 if __name__ == '__main__':
+    train = False
+    test = True
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     # Example of usage of the code provided and recommended hyper parameters for training GANs.
     data_root = './'
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     n_iter = 50000 # N training iterations
     n_critic_updates = 5 # N critic updates per generator update
     lp_coeff = 10 # Lipschitz penalty coefficient
@@ -66,48 +69,85 @@ if __name__ == '__main__':
     beta2 = 0.9
     z_dim = 100
 
-    train_loader, valid_loader, test_loader = svhn_sampler(data_root, train_batch_size, test_batch_size)
+    if train:
+    
+        train_loader, valid_loader, test_loader = svhn_sampler(data_root, train_batch_size, test_batch_size)
 
-    generator = Generator(z_dim=z_dim).to(device)
-    critic = Critic().to(device)
+        generator = Generator(z_dim=z_dim).to(device)
+        critic = Critic().to(device)
 
-    optim_critic = optim.Adam(critic.parameters(), lr=lr, betas=(beta1, beta2))
-    optim_generator = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, beta2))
+        optim_critic = optim.Adam(critic.parameters(), lr=lr, betas=(beta1, beta2))
+        optim_generator = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, beta2))
 
-    # COMPLETE TRAINING PROCEDURE
-    train_iter = iter(train_loader)
-    valid_iter = iter(valid_loader)
-    test_iter = iter(test_loader)
-    for i in tqdm(range(n_iter)):
-        generator.train()
-        critic.train()
-        for _ in range(n_critic_updates):
-            try:
-                data = next(train_iter)[0].to(device)
-            except Exception:
-                train_iter = iter(train_loader)
-                data = next(train_iter)[0].to(device)
-            
-            z = torch.randn(train_batch_size, z_dim, device=device)
-            gen_data = generator(z)
+        # COMPLETE TRAINING PROCEDURE
+        train_iter = iter(train_loader)
+        valid_iter = iter(valid_loader)
+        test_iter = iter(test_loader)
+        for i in tqdm(range(n_iter)):
+            generator.train()
+            critic.train()
+            for _ in range(n_critic_updates):
+                try:
+                    data = next(train_iter)[0].to(device)
+                except Exception:
+                    train_iter = iter(train_loader)
+                    data = next(train_iter)[0].to(device)
+                
+                z = torch.randn(train_batch_size, z_dim, device=device)
+                gen_data = generator(z)
+
+                # Train loss
+                optim_critic.zero_grad()
+                loss_critic = -vf_wasserstein_distance(data, gen_data, critic) + lp_coeff*lp_reg(data, gen_data, critic, device)
+                loss_critic.backward()
+                optim_critic.step()
 
             # Train loss
-            optim_critic.zero_grad()
-            loss_critic = -vf_wasserstein_distance(data, gen_data, critic) + lp_coeff*lp_reg(data, gen_data, critic, device)
-            loss_critic.backward()
-            optim_critic.step()
+            optim_generator.zero_grad()
+            gen_data = generator(z)
+            loss_gen = -torch.mean(critic(gen_data))
+            loss_gen.backward()
+            optim_generator.step()
 
-        # Train loss
-        optim_generator.zero_grad()
-        gen_data = generator(z)
-        loss_gen = -torch.mean(critic(gen_data))
-        loss_gen.backward()
-        optim_generator.step()
+            # Save sample images 
+            if i % 100 == 0:
+                z = torch.randn(64, z_dim, device=device)
+                imgs = generator(z)
+                save_image(imgs, f'./imgs/train/imgs_{i}.png', normalize=True, value_range=(-1, 1))
 
-        # Save sample images 
-        if i % 100 == 0:
-            z = torch.randn(64, z_dim, device=device)
-            imgs = generator(z)
-            save_image(imgs, f'./imgs/imgs_{i}.png', normalize=True, value_range=(-1, 1))
+        # Save models
+        torch.save(generator, './models/generator.pt')
+        torch.save(critic, './models/critic.pt')
+    
+    if test:
+        # COMPLETE QUALITATIVE EVALUATION
+        generator = torch.load('./models/generator.pt')
+        critic = torch.load('./models/critic.pt')
 
-    # COMPLETE QUALITATIVE EVALUATION
+        # Disentangled representation
+        z = torch.randn(test_batch_size, z_dim, device=device)
+        original = generator(z)
+        save_image(original, f'./imgs/disentangled/original.png', normalize=True, value_range=(-1, 1))
+
+        # Generated images
+        eps = 1.0
+        for i in tqdm(range(z.shape[1])):
+            z_gen = z.clone()
+            z_gen[:,i] += eps
+            imgs = generator(z_gen)
+            save_image(imgs, f'./imgs/disentangled/gen_{i}.png', normalize=True, value_range=(-1, 1))
+        
+        # Interpolation in latent space and pixel space
+        z_1 = torch.randn(test_batch_size, z_dim, device=device)
+        z_2 = torch.randn(test_batch_size, z_dim, device=device)
+        img_1 = generator(z_1)
+        img_2 = generator(z_2)
+        save_image(img_1, f'./imgs/interpolation/z_1.png', normalize=True, value_range=(-1, 1))
+        save_image(img_2, f'./imgs/interpolation/z_2.png', normalize=True, value_range=(-1, 1))
+
+        alphas = torch.linspace(0, 1, 11)
+        for a in tqdm(alphas):
+            z_interp = (1 - a)*z_1 + a*z_2
+            img_interp = (1 - a)*img_1 + img_2*a 
+            save_image(generator(z_interp), './imgs/interpolation/z_interp_{:.2f}.png'.format(a), normalize=True, value_range=(-1, 1))
+            save_image(img_interp, './imgs/interpolation/img_interp_{:.2f}.png'.format(a), normalize=True, value_range=(-1, 1))

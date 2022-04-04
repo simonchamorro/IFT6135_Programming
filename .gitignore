@@ -6,6 +6,10 @@ assignment2/data
 assignment3/binarized_mnist
 assignment3/*.mat
 assignment3/imgs
+assignment3/models_q1
+assignment3/models_q2
+assignment3/models_q3
+assignment3/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

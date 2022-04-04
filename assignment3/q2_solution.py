@@ -116,13 +116,13 @@ if __name__ == '__main__':
                 save_image(imgs, f'./imgs/train/imgs_{i}.png', normalize=True, value_range=(-1, 1))
 
         # Save models
-        torch.save(generator, './models/generator.pt')
-        torch.save(critic, './models/critic.pt')
+        torch.save(generator, './models_q2/generator.pt')
+        torch.save(critic, './models_q2/critic.pt')
     
     if test:
         # COMPLETE QUALITATIVE EVALUATION
-        generator = torch.load('./models/generator.pt')
-        critic = torch.load('./models/critic.pt')
+        generator = torch.load('./models_q2/generator.pt')
+        critic = torch.load('./models_q2/critic.pt')
 
         # Disentangled representation
         z = torch.randn(test_batch_size, z_dim, device=device)
@@ -130,12 +130,13 @@ if __name__ == '__main__':
         save_image(original, f'./imgs/disentangled/original.png', normalize=True, value_range=(-1, 1))
 
         # Generated images
-        eps = 1.0
+        epsilon = [1.0, 10.0, 20.0, 50.0, 100.0]
         for i in tqdm(range(z.shape[1])):
-            z_gen = z.clone()
-            z_gen[:,i] += eps
-            imgs = generator(z_gen)
-            save_image(imgs, f'./imgs/disentangled/gen_{i}.png', normalize=True, value_range=(-1, 1))
+            for eps in epsilon:
+                z_gen = z.clone()
+                z_gen[:,i] += eps
+                imgs = generator(z_gen)
+                save_image(imgs, f'./imgs/disentangled/gen_{i}_eps{eps}.png', normalize=True, value_range=(-1, 1))
         
         # Interpolation in latent space and pixel space
         z_1 = torch.randn(test_batch_size, z_dim, device=device)
@@ -151,3 +152,5 @@ if __name__ == '__main__':
             img_interp = (1 - a)*img_1 + img_2*a 
             save_image(generator(z_interp), './imgs/interpolation/z_interp_{:.2f}.png'.format(a), normalize=True, value_range=(-1, 1))
             save_image(img_interp, './imgs/interpolation/img_interp_{:.2f}.png'.format(a), normalize=True, value_range=(-1, 1))
+
+         

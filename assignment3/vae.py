@@ -21,6 +21,7 @@ Initialize libraries
 """
 
 import math
+import pickle
 from torchvision.datasets import utils
 import torch.utils.data as data_utils
 import torch
@@ -124,6 +125,7 @@ print(vae)
 
 """Train the model"""
 
+elbo_scores = []
 for i in range(20):
     # train
     for x in train:
@@ -141,14 +143,15 @@ for i in range(20):
             total_loss += vae.loss(x, *vae(x)) * x.size(0)
             total_count += x.size(0)
         print('-elbo: ', (total_loss / total_count).item())
+        elbo_scores.append((total_loss / total_count).item())
 
 """Save the model"""
 
-torch.save(vae, 'model.pt')
+torch.save(vae, 'models_q1/model.pt')
 
 """Load the model"""
 
-vae = torch.load('model.pt')
+vae = torch.load('models_q1/model.pt')
 
 """Evaluate the $\log p_\theta(x)$ of the model on test by using importance sampling"""
 
@@ -190,3 +193,7 @@ with torch.no_grad():
         total_count += M
       
 print('log p(x):', (total_loss / total_count).item())
+
+results = {'elbo_scores': elbo_scores, 'log_p_x': (total_loss / total_count).item()}
+with open('models_q1/results.pkl', 'wb') as f:
+    pickle.dump(results, f)

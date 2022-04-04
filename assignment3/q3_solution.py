@@ -138,7 +138,8 @@ class CosineSimilarity(Module):
         super(CosineSimilarity, self).__init__()
         self.dim = dim
         self.eps = eps
-
+        self.cos = nn.CosineSimilarity(dim=dim, eps=eps)
+    
     def forward(self, x1: Tensor, x2: Tensor) -> Tensor:
         """ 
         Input:
@@ -146,11 +147,9 @@ class CosineSimilarity(Module):
         Output:
             cos: cosine similarity between x1,x2
         """
-        """
-        COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
-        """
-        numerator = bdot(x1, x2)
-        denom = torch.norm(x1, p=2) * torch.norm(x2, p=2)
-        denom = denom if denom > self.eps else self.eps
-        similarity = numerator / denom
-        return similarity
+        # numerator = bdot(x1, x2)
+        # denom = torch.norm(x1, p=2) * torch.norm(x2, p=2)
+        # denom = denom if denom > self.eps else self.eps
+        # similarity = numerator / denom
+        # return similarity
+        return self.cos(x1, x2)

@@ -238,7 +238,7 @@ if __name__ == '__main__':
     # General
     seed = 2022
     num_workers = 2
-    save_path = './models_q3/no-pred-mlp/'
+    save_path = './models_q3/default/'
     resume = None #None or a path to a pretrained model (e.g. *.pth.tar')
     start_epoch = 0
     epochs = 200 #Number of epoches (for this question 100 is enough, however for 1000 epoches, you will get closer results to the original paper)
@@ -258,7 +258,7 @@ if __name__ == '__main__':
 
     # ablation experiments
     stop_gradient=True # (True or False)
-    MLP_mode='no_pred_mlp' # None|'no_pred_mlp'| 'fixed_random_init'
+    MLP_mode=None # None|'no_pred_mlp'| 'fixed_random_init'
 
     # optimizer
     lr = 0.03
@@ -276,7 +276,7 @@ if __name__ == '__main__':
 
     # Simsiam Model
     print("=> creating model '{}'".format(arch))
-    model = SimSiam(models.__dict__[arch], dim, pred_dim, stop_gradient=True, MLP_mode=None)
+    model = SimSiam(models.__dict__[arch], dim, pred_dim, stop_gradient=stop_gradient, MLP_mode=MLP_mode)
     # print(model)
 
     model.to(device)

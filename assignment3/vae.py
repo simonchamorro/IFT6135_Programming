@@ -31,6 +31,7 @@ from torch import nn
 from torch.nn.modules import upsampling
 from torch.functional import F
 from torch.optim import Adam
+from tqdm import tqdm
 
 """Complete **functions in q1_solution** to answer the questions 1.1~1.5"""
 
@@ -108,8 +109,8 @@ class VAE(nn.Module):
 
     def loss(self, x, z_mean, z_logvar, x_mean):
         ZERO = torch.zeros(z_mean.size())
-        #kl = kl_gaussian_gaussian_mc(z_mean, z_logvar, ZERO, ZERO, num_samples=1000).mean()
-        kl = kl_gaussian_gaussian_analytic(z_mean, z_logvar, ZERO, ZERO).mean()
+        kl = kl_gaussian_gaussian_mc(z_mean, z_logvar, ZERO, ZERO, num_samples=10).mean()
+        # kl = kl_gaussian_gaussian_analytic(z_mean, z_logvar, ZERO, ZERO).mean()
         recon_loss = -log_likelihood_bernoulli(
             torch.sigmoid(x_mean.view(x.size(0), -1)),
             x.view(x.size(0), -1),            
@@ -128,7 +129,7 @@ print(vae)
 elbo_scores = []
 for i in range(20):
     # train
-    for x in train:
+    for x in tqdm(train):
         optimizer.zero_grad()
         z_mean, z_logvar, x_mean = vae(x)
         loss = vae.loss(x, z_mean, z_logvar, x_mean)

@@ -98,9 +98,7 @@ def kl_gaussian_gaussian_analytic(mu_q, logvar_q, mu_p, logvar_p):
 def kl_gaussian_gaussian_mc(mu_q, logvar_q, mu_p, logvar_p, num_samples=1):
     """ 
     COMPLETE ME. DONT MODIFY THE PARAMETERS OF THE FUNCTION. Otherwise, tests might fail.
-
     *** note. ***
-
     :param mu_q: (FloatTensor) - shape: (batch_size x input_size) - The mean of first distributions (Normal distributions).
     :param logvar_q: (FloatTensor) - shape: (batch_size x input_size) - The log variance of first distributions (Normal distributions).
     :param mu_p: (FloatTensor) - shape: (batch_size x input_size) - The mean of second distributions (Normal distributions).
@@ -116,15 +114,11 @@ def kl_gaussian_gaussian_mc(mu_q, logvar_q, mu_p, logvar_p, num_samples=1):
     mu_p = mu_p.view(batch_size, -1).unsqueeze(1).expand(batch_size, num_samples, input_size)
     logvar_p = logvar_p.view(batch_size, -1).unsqueeze(1).expand(batch_size, num_samples, input_size)
 
-    # sample from q
-    samples = torch.normal(mu_q, (torch.exp(logvar_q)**(1/2)))
-
-    q = (1/torch.sqrt(2*math.pi*torch.exp(logvar_q)))*torch.exp((-1/2)*((samples-mu_q)**2)/torch.exp(logvar_q))
-    p = (1/torch.sqrt(2*math.pi*torch.exp(logvar_p)))*torch.exp((-1/2)*((samples-mu_p)**2)/torch.exp(logvar_p))
-
-    log_q = torch.log(q).sum(2)
-    log_p = torch.log(p).sum(2)
-
     # kld
-    kld = (log_q - log_p).mean(1)
-    return kld
+
+    q = torch.distributions.MultivariateNormal(mu_q, scale_tril=torch.diag_embed(torch.sqrt(torch.exp(logvar_q))))
+    p = torch.distributions.MultivariateNormal(mu_p, scale_tril=torch.diag_embed(torch.sqrt(torch.exp(logvar_p))))
+
+    z = q.rsample()
+
+    return torch.mean(q.log_prob(z) - p.log_prob(z), dim=1)
